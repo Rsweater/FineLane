@@ -62,6 +62,8 @@ class SRCNNLaneHead(nn.Module):
         self.test_cfg = test_cfg
         if self.train_cfg:
             self.assigner = build_assigner(train_cfg["assigner"])
+        self.assigner_proposals_topk = train_cfg["assigner_proposals_topk"]
+        self.assigner_lane_topk = train_cfg["assigner_lane_topk"]
 
         # Non-learnable parameters
         self.register_buffer(
@@ -208,24 +210,10 @@ class SRCNNLaneHead(nn.Module):
             # 2. ROI gather
             # pooled features [B * Np, C, Ns, 1] * stages
             # feature pyramid: [B, C, Hs, Ws] (s = 0, 1, 2)
-            cls_logits, reg, _, _ = self.attention(
+            cls_logits, reg, obj_feat, _ = self.attention(
                 pooled_features_stages, proposal_features, stage
             )  # [B, Np, Ch], Ch: fc_hidden_dim
-            # fc_features = fc_features.view(
-            #     self.num_priors, batch_size, -1
-            # ).reshape(
-            #     batch_size * self.num_priors, self.fc_hidden_dim
-            # )  # [B * Np, Ch]
 
-            # 3. cls and reg heads
-            # cls_features = fc_features.clone()
-            # reg_features = fc_features.clone()
-            # for cls_layer in self.cls_modules:
-            #     cls_features = cls_layer(cls_features)
-            # for reg_layer in self.reg_modules:
-            #     reg_features = reg_layer(reg_features)
-
-            # cls_logits = self.cls_layers(cls_features)
             cls_logits = cls_logits.reshape(
                 batch_size, -1, cls_logits.shape[1]
             )  # (B, Np, 2)
@@ -261,6 +249,10 @@ class SRCNNLaneHead(nn.Module):
                 priors_on_featmap = updated_anchor_xs.detach().clone()[
                     ..., self.sample_x_indices
                 ]
+                proposal_features = obj_feat
+                pred_dict["proposal"] = torch.zeros(batch_size, dtype=torch.bool)
+            else:
+                pred_dict["proposal"] = torch.ones(batch_size, dtype=torch.bool)
 
         return predictions_list
 
@@ -293,7 +285,7 @@ class SRCNNLaneHead(nn.Module):
                     k: v[b] for k, v in out_dict["predictions"][stage].items()
                 }
                 cls_pred = pred_dict["cls_logits"]
-                target = img_meta["lanes"].clone().to(device)  # [n_lanes, 78]
+                target = img_meta["gt_lanes"].clone().to(device)  # [n_lanes, 78]
                 target = target[target[:, 1] == 1]
                 cls_target = cls_pred.new_zeros(cls_pred.shape[0]).long()
 
@@ -304,20 +296,25 @@ class SRCNNLaneHead(nn.Module):
                     )
                     continue
 
+                if pred_dict["proposal"]:
+                    max_topk = self.assigner_proposals_topk
+                else:
+                    max_topk = self.assigner_lane_topk
+
                 with torch.no_grad():
                     (
                         matched_row_inds,
                         matched_col_inds,
                     ) = self.assigner.assign(
-                        pred_dict, target.clone(), img_meta
+                        pred_dict, target.clone(), max_topk, img_meta
                     )
 
                 # classification targets
                 cls_target[matched_row_inds] = 1
                 cls_loss = (
                     cls_loss
-                    + self.loss_cls(cls_pred, cls_target).sum()
-                    / target.shape[0]
+                    + self.loss_cls(cls_pred, cls_target,
+                    reduction_override='sum') / target.shape[0]
                 )
 
                 # regression targets -> [start_y, start_x, theta]
@@ -361,7 +358,7 @@ class SRCNNLaneHead(nn.Module):
                 iou_loss = iou_loss + self.loss_iou(
                     pred_xs * (self.img_w - 1) / self.img_w,
                     target_xs / self.img_w,
-                    # img_meta["eval_shape"],
+                    img_meta["eval_shape"],
                 )
 
         cls_loss /= batch_size * self.refine_layers

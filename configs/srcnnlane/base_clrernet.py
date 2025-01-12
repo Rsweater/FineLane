@@ -1,5 +1,5 @@
 model = dict(
-    type="SPGLaneNet",
+    type="Detector",
     backbone=dict(type="DLANet"),
     neck=dict(
         type="CLRerNetFPN",
@@ -7,11 +7,11 @@ model = dict(
         out_channels=64,
         num_outs=3,
     ),
-    bbox_head=dict(
+    lane_head=dict(
         type="SRCNNLaneHead",
         anchor_generator=dict(
             type="RefGenerator",
-            num_priors=192,
+            num_priors=64,
             num_points=72,
         ),
         img_w=800,
@@ -21,11 +21,11 @@ model = dict(
         refine_layers=3,
         sample_points=36,
         attention=dict(type="QueryUpdate"),
-        loss_cls=dict(type="KorniaFocalLoss", alpha=0.25, gamma=2, loss_weight=2.0),
+        loss_cls=dict(type="FocalLoss", alpha=0.25, gamma=2, loss_weight=2.0),
         loss_bbox=dict(type="SmoothL1Loss", reduction="none", loss_weight=0.2),
         loss_iou=dict(
-            type="CLRNetIoULoss",
-            # lane_width=7.5 / 800,
+            type="LaneIoULoss",
+            lane_width=7.5 / 800,
             loss_weight=4.0,
         ),
         loss_seg=dict(
@@ -40,24 +40,25 @@ model = dict(
     train_cfg=dict(
         assigner=dict(
             type="DynamicTopkAssigner",
-            max_topk=4,
             min_topk=1,
-            cost_combination=0,
+            cost_combination=1,
             cls_cost=dict(type="FocalCost", weight=1.0),
-            reg_cost=dict(type="DistanceCost", weight=1.0),
+            reg_cost=dict(type="DistanceCost", weight=0.0),
             iou_dynamick=dict(
-                type="CLRNetIoUCost",
-                # lane_width=7.5 / 800,
-                # use_pred_start_end=False,
-                # use_giou=True,
+                type="LaneIoUCost",
+                lane_width=7.5 / 800,
+                use_pred_start_end=False,
+                use_giou=True,
             ),
             iou_cost=dict(
-                type="CLRNetIoUCost",
-                # lane_width=30 / 800,
-                # use_pred_start_end=True,
-                # use_giou=True,
+                type="LaneIoUCost",
+                lane_width=30 / 800,
+                use_pred_start_end=True,
+                use_giou=True,
             ),
-        )
+        ),
+        assigner_proposals_topk=4,
+        assigner_lane_topk=4,
     ),
     test_cfg=dict(
         # conf threshold is obtained from cross-validation

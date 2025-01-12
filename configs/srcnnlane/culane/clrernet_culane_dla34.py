@@ -9,7 +9,7 @@ custom_imports = dict(
     imports=[
         "libs.models",
         "libs.datasets",
-        "libs.core.bbox",
+        "libs.core.lane",
         "libs.core.anchor",
         "libs.core.hook",
     ],
@@ -18,9 +18,15 @@ custom_imports = dict(
 
 cfg_name = "clrernet_culane_dla34.py"
 
-model = dict(test_cfg=dict(conf_threshold=0.43))
+model = dict(
+    backbone=dict(
+        type="DLANet",
+        dla="dla34",
+        pretrained=True,
+    ),
+    test_cfg=dict(conf_threshold=0.43))
 
-total_epochs = 21
+total_epochs = 30
 evaluation = dict(interval=3)
 checkpoint_config = dict(interval=total_epochs)
 
