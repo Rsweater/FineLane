@@ -6,7 +6,7 @@ from mmdet.core.bbox.match_costs import build_match_cost
 
 
 @BBOX_ASSIGNERS.register_module()
-class DynamicTopkAssigner(BaseAssigner):
+class One2ManyLaneAssigner(BaseAssigner):
     """Computes dynamick-to-one lane matching between predictions and ground truth (GT).
     The dynamic k for each GT is computed using Lane(Line)IoU matrix.
     The costs matrix is calculated from:
@@ -38,6 +38,7 @@ class DynamicTopkAssigner(BaseAssigner):
         reg_weight=3.0,
         cost_combination=0,
         use_pred_length_for_iou=True,
+        max_topk=4,
         min_topk=1,
     ):
         self.cls_cost = build_match_cost(cls_cost)
@@ -45,11 +46,12 @@ class DynamicTopkAssigner(BaseAssigner):
         self.iou_dynamick = build_match_cost(iou_dynamick)
         self.iou_cost = build_match_cost(iou_cost)
         self.use_pred_length_for_iou = use_pred_length_for_iou
+        self.max_topk = max_topk
         self.min_topk = min_topk
         self.reg_weight = reg_weight
         self.cost_combination = cost_combination
 
-    def dynamic_k_assign(self, cost, ious_matrix, max_topk):
+    def dynamic_k_assign(self, cost, ious_matrix):
         """
         Assign grouth truths with priors dynamically.
         Args:
@@ -62,13 +64,13 @@ class DynamicTopkAssigner(BaseAssigner):
         """
         matching_matrix = torch.zeros_like(cost)
         ious_matrix[ious_matrix < 0] = 0.0
-        topk_ious, _ = torch.topk(ious_matrix, max_topk, dim=0)
+        topk_ious, _ = torch.topk(ious_matrix, self.max_topk, dim=0)
         dynamic_ks = torch.clamp(topk_ious.sum(0).int(), min=self.min_topk)
         num_gt = cost.shape[1]
         for gt_idx in range(num_gt):
             _, pos_idx = torch.topk(
                 cost[:, gt_idx], k=dynamic_ks[gt_idx].item(), largest=False
-            )
+            ) # default: largest=True,
             matching_matrix[pos_idx, gt_idx] = 1.0
         del topk_ious, dynamic_ks, pos_idx
 
@@ -193,7 +195,6 @@ class DynamicTopkAssigner(BaseAssigner):
         self,
         predictions,
         targets,
-        max_topk,
         img_meta,
     ):
         """
@@ -234,7 +235,25 @@ class DynamicTopkAssigner(BaseAssigner):
             )
 
         matched_row_inds, matched_col_inds = self.dynamic_k_assign(
-            cost, iou_dynamick, max_topk=max_topk,
+            cost, iou_dynamick
         )
 
-        return matched_row_inds, matched_col_inds
+        # return matched_row_inds, matched_col_inds
+        cls_label = torch.unique(matched_col_inds)
+        final_match_row_inds = pred_xs.new_zeros(targets.shape[0])#one2one assignment results
+        final_match_col_inds = pred_xs.new_zeros(targets.shape[0])
+        for cls in cls_label:
+            cls = cls.item()
+            aux_cost = cost[:,cls].clone()
+            unmatch_cls_col = matched_row_inds[matched_col_inds != cls]
+            aux_cost[unmatch_cls_col] = 1000000000
+            cls_col = matched_col_inds==cls # label index
+            cls_row = matched_row_inds[cls_col] # pred index
+            cost_cls = cost[cls_row][:,cls]
+            assign_min_cost,indice = torch.min(cost_cls,dim = 0) # one-to-one assignment 
+            index_coord = torch.nonzero((aux_cost==assign_min_cost).int())
+            row_inds = index_coord[0][0]
+            final_match_row_inds[cls] = row_inds
+            final_match_col_inds[cls] = cls
+        
+        return matched_row_inds,matched_col_inds,final_match_row_inds,final_match_col_inds

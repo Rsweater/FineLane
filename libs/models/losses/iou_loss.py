@@ -1,6 +1,34 @@
 import torch
 from mmdet.models.builder import LOSSES
 
+def calc_iou(pred, target, pred_width, target_width):
+    """
+    Calculate the line iou value between predictions and targets
+    Args:
+        pred: lane predictions, shape: (Nl, Nr), relative coordinate
+        target: ground truth, shape: (Nl, Nr), relative coordinate
+        pred_width (torch.Tensor): virtual lane half-widths
+            for prediction at pre-defined rows, shape (Nl, Nr).
+        target_width (torch.Tensor): virtual lane half-widths
+            for GT at pre-defined rows, shape (Nl, Nr).
+    Returns:
+        torch.Tensor: calculated IoU, shape (N).
+    Nl: number of lanes, Nr: number of rows.
+    """
+    px1 = pred - pred_width
+    px2 = pred + pred_width
+    tx1 = target - target_width
+    tx2 = target + target_width
+
+    invalid_mask = target
+    ovr = torch.min(px2, tx2) - torch.max(px1, tx1)
+    union = torch.max(px2, tx2) - torch.min(px1, tx1)
+
+    invalid_masks = (invalid_mask < 0) | (invalid_mask >= 1.0)
+    ovr[invalid_masks] = 0.0
+    union[invalid_masks] = 0.0
+    iou = ovr.sum(dim=-1) / (union.sum(dim=-1) + 1e-9)
+    return iou
 
 @LOSSES.register_module
 class CLRNetIoULoss(torch.nn.Module):
@@ -17,41 +45,12 @@ class CLRNetIoULoss(torch.nn.Module):
         self.loss_weight = loss_weight
         self.lane_width = lane_width
 
-    def calc_iou(self, pred, target, pred_width, target_width):
-        """
-        Calculate the line iou value between predictions and targets
-        Args:
-            pred: lane predictions, shape: (Nl, Nr), relative coordinate
-            target: ground truth, shape: (Nl, Nr), relative coordinate
-            pred_width (torch.Tensor): virtual lane half-widths
-                for prediction at pre-defined rows, shape (Nl, Nr).
-            target_width (torch.Tensor): virtual lane half-widths
-                for GT at pre-defined rows, shape (Nl, Nr).
-        Returns:
-            torch.Tensor: calculated IoU, shape (N).
-        Nl: number of lanes, Nr: number of rows.
-        """
-        px1 = pred - pred_width
-        px2 = pred + pred_width
-        tx1 = target - target_width
-        tx2 = target + target_width
-
-        invalid_mask = target
-        ovr = torch.min(px2, tx2) - torch.max(px1, tx1)
-        union = torch.max(px2, tx2) - torch.min(px1, tx1)
-
-        invalid_masks = (invalid_mask < 0) | (invalid_mask >= 1.0)
-        ovr[invalid_masks] = 0.0
-        union[invalid_masks] = 0.0
-        iou = ovr.sum(dim=-1) / (union.sum(dim=-1) + 1e-9)
-        return iou
-
     def forward(self, pred, target):
         assert (
             pred.shape == target.shape
         ), "prediction and target must have the same shape!"
         width = torch.ones_like(target) * self.lane_width
-        iou = self.calc_iou(pred, target, width, width)
+        iou = calc_iou(pred, target, width, width)
         return (1 - iou).mean() * self.loss_weight
 
 
@@ -125,5 +124,5 @@ class LaneIoULoss(CLRNetIoULoss):
         pred_width, target_width = self._calc_lane_width(
             pred, target, eval_shape
         )
-        iou = self.calc_iou(pred, target, pred_width, target_width)
+        iou = calc_iou(pred, target, pred_width, target_width)
         return (1 - iou).mean() * self.loss_weight
