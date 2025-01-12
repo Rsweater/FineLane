@@ -25,6 +25,7 @@ class SPGLaneHead(nn.Module):
         anchor_generator,
         img_w=800,
         img_h=320,
+        prior_topk=24,
         prior_feat_channels=64,
         attention_in_channels=128,
         fc_hidden_dim=64,
@@ -44,6 +45,7 @@ class SPGLaneHead(nn.Module):
         self.anchor_generator = build_prior_generator(anchor_generator)
         self.img_w = img_w
         self.img_h = img_h
+        self.prior_topk = prior_topk
         self.refine_layers = refine_layers
         self.n_offsets = self.anchor_generator.num_offsets
         self.n_strips = self.n_offsets - 1
@@ -223,13 +225,17 @@ class SPGLaneHead(nn.Module):
         updated_proposal_xs = updated_proposal_xs.view(batch_size, self.num_priors, -1)
         pro_reg_xs = updated_proposal_xs + pro_reg[..., 4:]
 
+        pro_cls_scores = pro_cls[:, :, 1]
+        _, topk_inds = torch.topk(pro_cls_scores, k=self.prior_topk, dim=1, largest=True, sorted=False)
+        
+        # select topk by topk_ind
         pred_dict = {
-                "cls_logits": pro_cls,
-                "anchor_params": anchor_xyt,
-                "lengths": pro_reg[:, :, 3:4],
-                "xs": pro_reg_xs,
-                "proposal": torch.ones(batch_size, dtype=torch.bool)
-            }
+            "cls_logits": pro_cls[torch.arange(batch_size)[:, None], topk_inds], # (B, 20, 2)
+            "anchor_params": anchor_xyt[torch.arange(batch_size)[:, None], topk_inds], # (B, 20, 3)
+            "lengths": pro_reg[torch.arange(batch_size)[:, None], topk_inds, 3:4], # (B, 20, 1)
+            "xs": pro_reg_xs[torch.arange(batch_size)[:, None], topk_inds], # (B, 20, 36)
+            "proposal": torch.ones(batch_size, dtype=torch.bool) # proposal flag(B, )
+        }
         predictions_list = []
         predictions_list.append(pred_dict)
 
@@ -338,8 +344,8 @@ class SPGLaneHead(nn.Module):
                 cls_target[matched_row_inds] = 1
                 cls_loss = (
                     cls_loss
-                    + self.loss_cls(cls_pred, cls_target).sum()
-                    / target.shape[0]
+                    + self.loss_cls(cls_pred, cls_target,
+                    reduction_override='sum') / target.shape[0]
                 )
 
                 # regression targets -> [start_y, start_x, theta]
