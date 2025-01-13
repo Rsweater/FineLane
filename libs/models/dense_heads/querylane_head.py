@@ -53,7 +53,7 @@ class QueryLaneHead(nn.Module):
         self.num_priors = attention.num_priors = self.anchor_generator.num_priors
         self.sample_points = attention.sample_points = sample_points
         self.fc_hidden_dim = attention.fc_hidden_dim = fc_hidden_dim
-        attention.in_channel = attention_in_channels # [64, 64, 64]
+        attention.in_channels = attention_in_channels 
         self.prior_feat_channels = prior_feat_channels
         
         # Non-learnable parameters

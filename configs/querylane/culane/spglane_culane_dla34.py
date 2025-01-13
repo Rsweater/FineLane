@@ -45,4 +45,4 @@ log_config = dict(
         dict(type="TensorboardLoggerHookEpoch"),
     ]
 )
-# find_unused_parameters=True
+find_unused_parameters=True

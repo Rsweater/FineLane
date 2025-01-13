@@ -78,10 +78,10 @@ class QueryROI(nn.Module):
     def forward(self, roi_features, proposal_features, layer_index):
         roi = self.forward_roi(
             roi_features, layer_index, proposal_features.size(0)
-        ).permute(0, 2, 1)  # [B, Np, Ch] -> [B, Ch, Np]
+        )  # [B, Np, Ch]
 
         if self.cross_attention_weight > 0:
-            context = self.attention(proposal_features, roi)
+            context = self.attention(proposal_features, roi.permute(0, 2, 1))
             roi = roi + self.cross_attention_weight * F.dropout(
                 context, p=0.1, training=self.training
             )
@@ -98,15 +98,18 @@ class AnchorVecFeatureMapAttention(nn.Module):
         """
         super(AnchorVecFeatureMapAttention, self).__init__()
         self.dim = dim
-        self.f_key = ConvModule(
-            in_channels=dim,
-            out_channels=dim,
-            kernel_size=1,
-            stride=1,
-            padding=0,
-            norm_cfg=dict(type='BN'),
+        self.f_key = nn.Sequential(
+            nn.Conv1d(
+                in_channels=dim,
+                out_channels=dim,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                groups=dim,
+            ),
+            nn.BatchNorm1d(dim),
+            nn.ReLU(),
         )
-
         self.f_query = nn.Sequential(
             nn.Conv1d(
                 in_channels=n_query,
@@ -118,7 +121,7 @@ class AnchorVecFeatureMapAttention(nn.Module):
             ),
             nn.ReLU(),
         )
-        self.f_value = nn.Conv2d(
+        self.f_value = nn.Conv1d(
             in_channels=dim, out_channels=dim, kernel_size=1, stride=1, padding=0
         )
         self.W = nn.Conv1d(
