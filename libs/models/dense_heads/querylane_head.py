@@ -25,7 +25,7 @@ class QueryLaneHead(nn.Module):
         anchor_generator,
         img_w=800,
         img_h=320,
-        prior_topk=24,
+        prior_topk=25,
         prior_feat_channels=64,
         attention_in_channels=128,
         fc_hidden_dim=64,
@@ -249,14 +249,10 @@ class QueryLaneHead(nn.Module):
         for stage, feature in enumerate(prefusion_feature):
             pooled_feature = self.pool_prior_features(feature, priors_on_featmap)
             pooled_features.append(pooled_feature)
-            fc_features = self.attention(
+            query_feats = self.attention(
                 pooled_features, query_feats, stage
             )
-            # pooled_features_stages.append(pooled_feature)
-        # fc_features = self.attention(
-        #     pooled_features_stages, batch_size
-        # )  # [B, Np, Ch], Ch: fc_hidden_dim
-        fc_features = fc_features.view(self.num_priors, batch_size, -1).reshape(
+        fc_features = query_feats.view(self.num_priors, batch_size, -1).reshape(
             batch_size * self.num_priors, self.fc_hidden_dim
         )  # [B * Np, Ch]
 
