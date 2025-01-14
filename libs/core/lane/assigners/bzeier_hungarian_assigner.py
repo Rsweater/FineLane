@@ -53,7 +53,7 @@ class BezierHungarianAssigner(BaseAssigner):
 
         # curve sampling cost
         # (Np, N_sample_points, 2)
-        pred_sample_points = self.bezier_curve.get_sample_points(control_points_matrix=pred_dict['pred_control_points'],
+        pred_sample_points = self.bezier_curve.get_sample_points(control_points_matrix=pred_dict['control_points'],
                                                                  num_sample_points=100)
         # (Ng, N_sample_points, 2)
         gt_sample_points = self.bezier_curve.get_sample_points(control_points_matrix=gt_lanes,
