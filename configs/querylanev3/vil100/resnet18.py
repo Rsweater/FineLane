@@ -22,12 +22,13 @@ model = dict(
         type='ResNet',
         depth=18,
         num_stages=4,
-        out_indices=(0, 1, 2, 3),
-        frozen_stages=-1,
+        out_indices=(1, 2, 3),
+        frozen_stages=1,
         norm_cfg=dict(type='BN', requires_grad=True),
-        norm_eval=False,
+        norm_eval=True,
         style='pytorch',
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet18')),
+        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet18')
+    ),
     lane_head=dict(
         loss_seg=dict(
             loss_weight=0.75,
@@ -41,13 +42,13 @@ model = dict(
         cut_height="no fixed size",
         # inference settings
         conf_threshold=0.4,
-        window_size=5,
+        window_size=3,
         max_num_lanes=6,
         num_sample_points=50,
     ),
 )
 
-total_epochs = 400
+total_epochs = 300
 evaluation = dict(start=10, interval=3)
 checkpoint_config = dict(interval=1, max_keep_ckpts=10)
 custom_hooks = [dict(type="ExpMomentumEMAHook", momentum=0.0001, priority=20)]
