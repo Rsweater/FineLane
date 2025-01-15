@@ -17,12 +17,13 @@ model = dict(
     lane_head=dict(
         type="SPGLaneHead",
         anchor_generator=dict(
-            type="RefGenerator",
+            type="CLRerNetAnchorGenerator",
             num_priors=64,
             num_points=72,
         ),
         img_w=800,
         img_h=320,
+        prior_topk=32,
         prior_feat_channels=256,
         fc_hidden_dim=128,
         seg_channel=128+128+256,
@@ -41,7 +42,7 @@ model = dict(
         loss_seg=dict(
             type="CLRNetSegLoss",
             loss_weight=2.0,
-            num_classes=9,  # 8 lanes + 1 background
+            num_classes=5,  # 4 lanes + 1 background
             ignore_label=255,
             bg_weight=0.4,
         ),
