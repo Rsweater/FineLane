@@ -1,1 +1,2 @@
-from .anchor_generator import RefGenerator
+from .ref_line_generator import RefGenerator
+from .anchor_generator import CLRerNetAnchorGenerator
