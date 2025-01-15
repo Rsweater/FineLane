@@ -82,11 +82,11 @@ class QueryROI(nn.Module):
 
         if self.cross_attention_weight > 0:
             context = self.attention(proposal_features, roi.permute(0, 2, 1))
-            roi = roi + self.cross_attention_weight * F.dropout(
+            proposal_features = proposal_features + self.cross_attention_weight * F.dropout(
                 context, p=0.1, training=self.training
             )
 
-        return roi
+        return proposal_features
 
 
 class AnchorVecFeatureMapAttention(nn.Module):
