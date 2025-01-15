@@ -57,7 +57,7 @@ class QueryLaneHeadV2(nn.Module):
         self.channel_attention = CSAM2d(prior_feat_channels)
 
         # proposal fc stage
-        self.pro_num_fixed_fc = nn.Linear(225, self.num_priors)
+        self.pro_num_fixed_fc = nn.Linear(250, self.num_priors)
         self.pro_num_fixed_fc_norm = nn.LayerNorm(self.num_priors)
 
         pro_shared_branchs_fc = list()
@@ -102,19 +102,19 @@ class QueryLaneHeadV2(nn.Module):
                 seg_channel, loss_seg.num_classes,
             )
 
-        # self.init_weights()
+        self.init_weights()
 
-    # def init_weights(self):
+    def init_weights(self):
         # initialize heads
-        # for m in self.cls_layers.parameters():
-        #     nn.init.normal_(m, mean=0.0, std=1e-3)
-        # for m in self.reg_layers.parameters():
-        #     nn.init.normal_(m, mean=0.0, std=1e-3)
+        for m in self.cls_layers.parameters():
+            nn.init.normal_(m, mean=0.0, std=1e-3)
+        for m in self.reg_layers.parameters():
+            nn.init.normal_(m, mean=0.0, std=1e-3)
 
-        # for m in self.pro_cls_layers.parameters():
-        #     nn.init.normal_(m, mean=0.0, std=1e-3)
-        # for m in self.pro_reg_layers.parameters():
-        #     nn.init.normal_(m, mean=0.0, std=1e-3)
+        for m in self.pro_cls_layers.parameters():
+            nn.init.normal_(m, mean=0.0, std=1e-3)
+        for m in self.pro_reg_layers.parameters():
+            nn.init.normal_(m, mean=0.0, std=1e-3)
 
     def pool_prior_features(self, batch_features, prior_xs):
         """
@@ -136,7 +136,7 @@ class QueryLaneHeadV2(nn.Module):
         ).contiguous()
         feature = feature.reshape(
             batch_size * self.num_priors,
-            self.prior_feat_channels,
+            self.fc_hidden_dim,
             self.feat_sample_points,
             1,
         )
