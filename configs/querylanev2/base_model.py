@@ -2,11 +2,12 @@ model = dict(
     type="Detector",
     backbone=dict(type="DLANet"),
     neck=dict(
-        type="CLRerNetFPN",
+        type='SPGChannelMapper',
         in_channels=[128, 256, 512],
-        out_channels=128,
-        num_outs=3,
-    ),
+        kernel_size=1,
+        out_channels=[128, 128, 128],
+        act_cfg=None,
+        norm_cfg=dict(type='GN', num_groups=32)),
     lane_head=dict(
         type="QueryLaneHeadV2",
         prior_feat_channels=128,

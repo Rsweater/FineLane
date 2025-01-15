@@ -134,7 +134,7 @@ class QueryLaneHeadV2(nn.Module):
         ).contiguous()
         feature = feature.reshape(
             batch_size * self.num_priors,
-            self.prior_feat_channels,
+            self.fc_hidden_dim,
             self.feat_sample_points,
             1,
         )

@@ -5,7 +5,7 @@ from torch import nn
 
 
 @PRIOR_GENERATORS.register_module()
-class CLRerNetAnchorGenerator(nn.Module):
+class RefGenerator(nn.Module):
     """
     Anchor (prior) generator.
     Adapted from:
@@ -22,17 +22,17 @@ class CLRerNetAnchorGenerator(nn.Module):
             num_priors (int): Number of anchors.
             num_points (int): Number of points (rows) in one anchor.
         """
-        super(CLRerNetAnchorGenerator, self).__init__()
+        super(RefGenerator, self).__init__()
         self.num_priors = num_priors
         self.num_offsets = num_points
         self.prior_embeddings = nn.Embedding(self.num_priors, 3)
         self.init_anchors()
 
     def init_anchors(self):
-        bottom_priors_nums = self.num_priors * 3 // 4
-        left_priors_nums, _ = self.num_priors // 8, self.num_priors // 8
+        bottom_priors_nums = self.num_priors * 2 // 4
+        left_priors_nums, _ = self.num_priors // 4, self.num_priors // 4
 
-        strip_size = 0.5 / (left_priors_nums // 2 - 1)
+        strip_size = 1.0 / (left_priors_nums // 2 - 1)
         bottom_strip_size = 1 / (bottom_priors_nums // 4 + 1)
         for i in range(left_priors_nums):
             nn.init.constant_(
