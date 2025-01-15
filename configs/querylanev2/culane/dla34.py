@@ -59,7 +59,7 @@ checkpoint_config = dict(interval=1, max_keep_ckpts=10)
 data = dict(samples_per_gpu=32)  # single GPU setting
 
 # optimizer
-optimizer = optimizer = dict(type="AdamW", lr=6e-4)
+optimizer = dict(type="AdamW", lr=6e-4)
 optimizer_config = dict(grad_clip=None)
 
 # learning policy

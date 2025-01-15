@@ -15,13 +15,19 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-cfg_name = "bezierlanenet_vil100_dla34.py"
+cfg_name = "querylanev2_vil100_dla34.py"
 
 model = dict(
     backbone=dict(
         type="DLANet",
         dla="dla34",
         pretrained=True,
+    ),
+    lane_head=dict(
+        loss_seg=dict(
+            # loss_weight=2.0,
+            num_classes=9,  # 8 lane + 1 background
+        ),
     ),
     test_cfg=dict(
         # dataset info
@@ -37,21 +43,15 @@ model = dict(
 )
 
 total_epochs = 400
-evaluation = dict(start=10, interval=10)
+evaluation = dict(start=10, interval=3)
 checkpoint_config = dict(interval=1, max_keep_ckpts=10)
+custom_hooks = [dict(type="ExpMomentumEMAHook", momentum=0.0001, priority=20)]
 
 
 data = dict(samples_per_gpu=48, workers_per_gpu=4)  # single GPU setting
 
 # optimizer
-optimizer = dict(
-    type='Adam',
-    lr=1e-3,
-    paramwise_cfg=dict(
-        custom_keys={
-            'conv_offset': dict(lr_mult=0.1),
-        }),
-)
+optimizer = dict(type="AdamW", lr=7e-4)
 optimizer_config = dict(grad_clip=None)
 
 # learning policy

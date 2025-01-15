@@ -8,16 +8,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from mmcv.cnn.bricks.transformer import build_attention
 from mmdet.core import build_assigner
-from mmdet.core import build_prior_generator
 from mmdet.models.builder import build_loss
 from mmdet.models.builder import HEADS
-from nms import nms
 
 from libs.models.dense_heads.seg_decoder import SegDecoder
 from libs.models.layers.fusion_blocks import CSAM2d
 from libs.utils.lane_utils import Lane
 from libs.core.lane.bezier_curve import BezierCurve
-
 
 @HEADS.register_module
 class QueryLaneHeadV2(nn.Module):
@@ -26,6 +23,7 @@ class QueryLaneHeadV2(nn.Module):
         img_w=800,
         img_h=320,
         prior_topk=25,
+        num_priors=64,
         prior_feat_channels=128,
         attention_in_channels=128,
         fc_hidden_dim=64,
@@ -47,7 +45,7 @@ class QueryLaneHeadV2(nn.Module):
         self.img_h = img_h
         self.prior_topk = prior_topk
         self.refine_layers = refine_layers
-        self.num_priors = attention.num_priors = 64
+        self.num_priors = attention.num_priors = num_priors
         self.feat_sample_points = attention.sample_points = feat_sample_points
         self.fc_hidden_dim = attention.fc_hidden_dim = fc_hidden_dim
         attention.in_channels = attention_in_channels 
@@ -57,7 +55,7 @@ class QueryLaneHeadV2(nn.Module):
         self.channel_attention = CSAM2d(prior_feat_channels)
 
         # proposal fc stage
-        self.pro_num_fixed_fc = nn.Linear(225, self.num_priors)
+        self.pro_num_fixed_fc = nn.Linear(250, self.num_priors)
         self.pro_num_fixed_fc_norm = nn.LayerNorm(self.num_priors)
 
         pro_shared_branchs_fc = list()
@@ -102,19 +100,19 @@ class QueryLaneHeadV2(nn.Module):
                 seg_channel, loss_seg.num_classes,
             )
 
-        # self.init_weights()
+        self.init_weights()
 
-    # def init_weights(self):
+    def init_weights(self):
         # initialize heads
-        # for m in self.cls_layers.parameters():
-        #     nn.init.normal_(m, mean=0.0, std=1e-3)
-        # for m in self.reg_layers.parameters():
-        #     nn.init.normal_(m, mean=0.0, std=1e-3)
+        for m in self.cls_layers.parameters():
+            nn.init.normal_(m, mean=0.0, std=1e-3)
+        for m in self.reg_layers.parameters():
+            nn.init.normal_(m, mean=0.0, std=1e-3)
 
-        # for m in self.pro_cls_layers.parameters():
-        #     nn.init.normal_(m, mean=0.0, std=1e-3)
-        # for m in self.pro_reg_layers.parameters():
-        #     nn.init.normal_(m, mean=0.0, std=1e-3)
+        for m in self.pro_cls_layers.parameters():
+            nn.init.normal_(m, mean=0.0, std=1e-3)
+        for m in self.pro_reg_layers.parameters():
+            nn.init.normal_(m, mean=0.0, std=1e-3)
 
     def pool_prior_features(self, batch_features, prior_xs):
         """

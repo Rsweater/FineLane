@@ -16,7 +16,7 @@ model = dict(
         attention=dict(type="QueryROI", refine_layers=2),
         # loss_cls=dict(type="FocalLoss", alpha=0.25, gamma=2, loss_weight=0.1),
         loss_dist=dict(
-            type='L1Loss',
+            type='SmoothL1Loss',
             reduction='mean',
             loss_weight=10.0,
         ),
