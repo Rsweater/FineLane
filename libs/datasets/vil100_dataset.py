@@ -29,7 +29,7 @@ class VIL100Dataset(Dataset):
         diff_file=None,
         diff_thr=15,
         test_mode=True,
-        y_step=2,
+        y_step=1,
     ):
         """
         Args:

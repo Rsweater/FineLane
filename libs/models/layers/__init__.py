@@ -5,3 +5,4 @@ from .fusion_blocks import CSAM2d
 from .query_update import QueryUpdate
 from .query_roi import QueryROI
 from .query_feat import QueryFeat
+from .lka import Block as SA_Block

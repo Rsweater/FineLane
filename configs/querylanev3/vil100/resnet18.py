@@ -15,7 +15,7 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-cfg_name = "querylanev2_vil100_r18.py"
+cfg_name = "querylanev3_vil100_r18.py"
 
 model = dict(
     backbone=dict(
@@ -42,13 +42,13 @@ model = dict(
         cut_height="no fixed size",
         # inference settings
         conf_threshold=0.4,
-        window_size=3,
+        window_size=5,
         max_num_lanes=6,
         num_sample_points=50,
     ),
 )
 
-total_epochs = 300
+total_epochs = 400
 evaluation = dict(start=10, interval=3)
 checkpoint_config = dict(interval=1, max_keep_ckpts=10)
 custom_hooks = [dict(type="ExpMomentumEMAHook", momentum=0.0001, priority=20)]
@@ -58,12 +58,12 @@ data = dict(samples_per_gpu=48, workers_per_gpu=8)  # single GPU setting
 
 # optimizer
 optimizer = dict(
-    type='Adam',
-    lr=1e-3,
-    paramwise_cfg=dict(
-        custom_keys={
-            'conv_offset': dict(lr_mult=0.1),
-        }),
+    type='AdamW',
+    lr=1e-4,
+    weight_decay=1e-4,
+    gamma=0.5,
+    betas=(0.9, 0.999),
+    eps=1e-8
 )
 optimizer_config = dict(grad_clip=None)
 
