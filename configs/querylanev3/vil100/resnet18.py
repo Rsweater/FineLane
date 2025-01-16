@@ -58,24 +58,13 @@ data = dict(samples_per_gpu=48, workers_per_gpu=8)  # single GPU setting
 
 # optimizer
 optimizer = dict(
-    type='AdamW',
-    lr=1e-4,
-    weight_decay=1e-4,
-    gamma=0.5,
-    betas=(0.9, 0.999),
-    eps=1e-8
+    type='Adam',
+    lr=1.2e-3,
 )
 optimizer_config = dict(grad_clip=None)
 
 # learning policy
-lr_config = dict(
-    policy='CosineAnnealing',
-    warmup='linear',
-    warmup_iters=500,
-    warmup_ratio=1.0 / 3,
-    min_lr_ratio=1e-3,
-    by_epoch=True
-)
+lr_config = dict(policy="CosineAnnealing", min_lr=6e-4, by_epoch=False)
 
 log_config = dict(
     interval=10,
