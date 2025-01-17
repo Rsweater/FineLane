@@ -22,10 +22,10 @@ model = dict(
         type='ResNet',
         depth=18,
         num_stages=4,
-        out_indices=(1, 2, 3),
-        frozen_stages=1,
+        out_indices=(0, 1, 2, 3),
+        frozen_stages=-1,
         norm_cfg=dict(type='BN', requires_grad=True),
-        norm_eval=True,
+        norm_eval=False,
         style='pytorch',
         init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet18')
     ),
@@ -59,12 +59,23 @@ data = dict(samples_per_gpu=48, workers_per_gpu=8)  # single GPU setting
 # optimizer
 optimizer = dict(
     type='Adam',
-    lr=1.2e-3,
+    lr=1e-3,
+    paramwise_cfg=dict(
+        custom_keys={
+            'conv_offset': dict(lr_mult=0.1),
+        }),
 )
 optimizer_config = dict(grad_clip=None)
 
 # learning policy
-lr_config = dict(policy="CosineAnnealing", min_lr=6e-4, by_epoch=False)
+lr_config = dict(
+    policy='CosineAnnealing',
+    warmup='linear',
+    warmup_iters=500,
+    warmup_ratio=1.0 / 3,
+    min_lr_ratio=1e-3,
+    by_epoch=True
+)
 
 log_config = dict(
     interval=10,
