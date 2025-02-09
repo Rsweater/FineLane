@@ -15,7 +15,7 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-cfg_name = "querylanev31_vil100_r18.py"
+cfg_name = "querylanev3_vil100_r18.py"
 
 ckpt_timm = 'https://dl.fbaipublicfiles.com/semiweaksupervision/model_files/semi_weakly_supervised_resnet18-118f1556.pth'
 model = dict(

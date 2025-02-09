@@ -1,5 +1,5 @@
 model = dict(
-    type="Detector",
+    type="VLaneDetector",
     backbone=dict(type="DLANet"),
     neck=dict(
         type="SA_FPN",
@@ -8,7 +8,7 @@ model = dict(
         num_outs=3,
     ),
     lane_head=dict(
-        type="QueryLaneHeadV31",
+        type="QueryLaneHeadV5",
         prior_feat_channels=128,
         attention_in_channels=128,
         fc_hidden_dim=128,
