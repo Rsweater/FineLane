@@ -15,7 +15,7 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-cfg_name = "querylanev2_vil100_r18.py"
+cfg_name = "c_vil100_r18.py"
 
 model = dict(
     backbone=dict(
@@ -27,7 +27,11 @@ model = dict(
         norm_cfg=dict(type='BN', requires_grad=True),
         norm_eval=False,
         style='pytorch',
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet18')),
+        init_cfg=dict(
+            type='Pretrained',
+            checkpoint=
+            'https://dl.fbaipublicfiles.com/semiweaksupervision/model_files/semi_weakly_supervised_resnet18-118f1556.pth'
+        )),
     lane_head=dict(
         loss_seg=dict(
             loss_weight=0.75,
@@ -53,7 +57,7 @@ checkpoint_config = dict(interval=1, max_keep_ckpts=10)
 custom_hooks = [dict(type="ExpMomentumEMAHook", momentum=0.0001, priority=20)]
 
 
-data = dict(samples_per_gpu=48, workers_per_gpu=8)  # single GPU setting
+data = dict(samples_per_gpu=24, workers_per_gpu=8)  # single GPU setting
 
 # optimizer
 optimizer = dict(

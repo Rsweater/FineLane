@@ -24,3 +24,6 @@ __pycache__/
 # tmp remove docker files
 docker-compose.yml
 docker/
+
+.history
+

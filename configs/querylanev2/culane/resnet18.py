@@ -15,21 +15,23 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-cfg_name = "bezierlanenet_culane_r18.py"
+cfg_name = "querylanev2_culane_r18.py"
 
 model = dict(
     backbone=dict(
         type='ResNet',
         depth=18,
-        num_stages=3,
-        strides=(1, 2, 2),
-        dilations=(1, 1, 1),
-        out_indices=(2,),
+        num_stages=4,
+        out_indices=(0, 1, 2, 3),
         frozen_stages=-1,
         norm_cfg=dict(type='BN', requires_grad=True),
         norm_eval=False,
         style='pytorch',
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet18')),
+        init_cfg=dict(
+            type='Pretrained',
+            checkpoint=
+            'https://dl.fbaipublicfiles.com/semiweaksupervision/model_files/semi_weakly_supervised_resnet18-118f1556.pth'
+        )),
     lane_head=dict(
         # type="BezierLaneHeadV2",
         loss_cls=dict(
@@ -57,18 +59,19 @@ model = dict(
     ),
 )
 
-custom_hooks = [dict(type="ExpMomentumEMAHook", momentum=0.0001, priority=5)]
+
 
 total_epochs = 36
 evaluation = dict(start=3, interval=3)
 checkpoint_config = dict(interval=1, max_keep_ckpts=10)
+custom_hooks = [dict(type="ExpMomentumEMAHook", momentum=0.0001, priority=5)]
 
-data = dict(samples_per_gpu=32)  # single GPU setting
+data = dict(samples_per_gpu=24, workers_per_gpu=4)  # single GPU setting
 
 # optimizer
 optimizer = dict(
     type='Adam',
-    lr=3e-3,
+    lr=1e-3,
     paramwise_cfg=dict(
         custom_keys={
             'conv_offset': dict(lr_mult=0.1),

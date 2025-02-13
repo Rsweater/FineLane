@@ -29,7 +29,6 @@ class QueryLaneHeadV2(nn.Module):
         fc_hidden_dim=64,
         seg_channel=64+64+64,
         num_fc=2,
-        refine_layers=3,
         feat_sample_points=30,
         loss_sample_points=100,
         attention=None,
@@ -44,7 +43,7 @@ class QueryLaneHeadV2(nn.Module):
         self.img_w = img_w
         self.img_h = img_h
         self.prior_topk = prior_topk
-        self.refine_layers = refine_layers
+        self.refine_layers = attention.refine_layers + 1
         self.num_priors = attention.num_priors = num_priors
         self.feat_sample_points = attention.sample_points = feat_sample_points
         self.fc_hidden_dim = attention.fc_hidden_dim = fc_hidden_dim
@@ -302,7 +301,7 @@ class QueryLaneHeadV2(nn.Module):
                     gt_control_points, num_sample_points=self.loss_sample_points
                 )
                 dist_loss = (
-                    dist_loss + self.loss_dist(pred_sample_points, gt_sample_points).mean()
+                    dist_loss + self.loss_dist(pred_sample_points, gt_sample_points).mean() #测试去掉mean
                 )
 
         cls_loss = cls_loss / batch_size * len(out_dict["predictions"])
