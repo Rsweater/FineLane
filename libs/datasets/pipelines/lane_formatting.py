@@ -613,3 +613,127 @@ class CollectGAinfo(Collect):
         for key in self.keys:
             data[key] = results[key]
         return data
+
+
+@PIPELINES.register_module
+class CollectRowAnchor(Collect):
+    def __init__(self, keys=None, meta_keys=None, row_anchor, grid_num=100, max_lanes=6, img_scale=(800, 288)):
+        self.row_anchor = row_anchor
+        self.grid_num = grid_num
+        self.max_lanes = max_lanes
+        self.img_scale = img_scale
+
+    def find_start_pos(self, row_anchor, start_line):
+        l, r = 0, len(row_anchor)-1
+        while True:
+            mid = int((l+r)/2)
+            if r - l == 1:
+                return r
+            if row_anchor[mid] < start_line:
+                l = mid
+            if row_anchor[mid] > start_line:
+                r = mid
+            if row_anchor[mid] == start_line:
+                return mid
+
+    def grid_pts(self, pts, w):
+        """
+        Args:
+            pts: (N_lanes, N_row_anchors, 2)  2: (row_anchor, x_pos/-1)
+            w:  img_w
+        Returns:
+            row_anchor_label: (N_row_anchors, N_lanes)
+                              # 不存在lane时: --> num_cols=griding_num
+                              # 存在: col_id
+        """
+        grid_interval = (w - 1) / (self.grid_num - 1)
+        row_anchor_label = np.zeros((len(self.row_anchor), self.max_lanes))     # (N_row_anchors, N_lanes)
+        for i in range(self.max_lanes):
+            pti = pts[i, :, 1]      # 该lane在所有row_anchors上对应的x_pos  (N_row_anchors, ）
+            row_anchor_label[:, i] = np.array([round(pt / grid_interval) if pt != -1 else
+                                               self.grid_num for pt in pti])
+
+        return row_anchor_label
+
+    def _transform_annotation(self, results):
+        seg = results['gt_semantic_seg']        # (H, W)
+
+        h, w = seg.shape
+        dst_w, dst_h = self.img_scale
+        if h != dst_h:
+            scale_f = lambda x: int((x * 1.0/dst_h) * h)
+            row_anchor = list(map(scale_f, self.row_anchor))
+        else:
+            row_anchor = self.row_anchor
+
+        # (N_lanes, N_row_anchors, 2)  2: (row_anchor, x_pos/-1)
+        all_idx = np.zeros((self.max_lanes, len(row_anchor), 2))
+        for i, r in enumerate(row_anchor):  # 遍历row_anchor
+            cur_row_seg = seg[round(r)]     # (W, )  label图像中第r行, 与row anchor对应
+            for lane_idx in range(1, self.max_lanes+1):   # 遍历lanes
+                pos = np.where(cur_row_seg == lane_idx)[0]      # 寻找与该lane对应的区域（x区域）, 可能有多个点.
+                if len(pos) == 0:
+                    all_idx[lane_idx - 1, i, 0] = r
+                    all_idx[lane_idx - 1, i, 1] = -1
+                    continue
+                pos = np.mean(pos)
+                all_idx[lane_idx - 1, i, 0] = r     # 分别记录对应的row_anchor 和 所处的x坐标.
+                all_idx[lane_idx - 1, i, 1] = pos
+
+        # 将lanes延伸到图像底部
+        all_idx_cp = all_idx.copy()     # (N_lanes, N_row_anchor, 2)
+        for i in range(self.max_lanes):
+            if np.all(all_idx_cp[i, :, 1] == -1):
+                continue
+
+            # 获取该lane对应的所有valid points
+            valid = all_idx_cp[i, :, 1] != -1    # (N_row_anchor, )
+            valid_idx = all_idx_cp[i, valid, :]  # (N_valid, 2)
+            if valid_idx[-1, 0] == row_anchor[-1]:
+                # 意味着这条lane已经到达图像底部
+                continue
+            if len(valid_idx) < 6:
+                # 这条lane太短，不适合去延伸.
+                continue
+
+            valid_idx_half = valid_idx[len(valid_idx) // 2:, :]     # (N_valid//2, 2)  2: (row_anchor_id, x_pos)
+            p = np.polyfit(valid_idx_half[:, 0], valid_idx_half[:, 1], deg=1)  # 根据row_anchor 和 对应的 x_pos 进行拟合.
+            start_line = valid_idx_half[-1, 0]  # lane截止时的row_anchor
+            pos = self.find_start_pos(row_anchor, start_line) + 1  # 找到该row_anchor在所有row_anchors中id + 1.
+
+            fitted = np.polyval(p, row_anchor[pos:])  # 根据后N_row-pos个row_anchor值，拟合对应的的x_pos.
+            fitted = np.array([-1 if x < 0 or x > w - 1 else x for x in fitted])  # 如果超出图像范围为-1, 否则为拟合的x_pos.
+
+            assert np.all(all_idx_cp[i, pos:, 1] == -1)
+            all_idx_cp[i, pos:, 1] = fitted  # 根据拟合值进行更新
+
+        row_anchor_label = self.grid_pts(all_idx_cp, w)     # (N_row_anchors, N_lanes)
+        results['row_anchor_label'] = DC(to_tensor(row_anchor_label), stack=True, pad_dims=None)
+
+        # img = results['img'].copy()
+        # for lane_idx in range(row_anchor_label.shape[1]):
+        #     lane = []
+        #     cur_row_anchor_label = row_anchor_label[:, lane_idx]    # (N_row_anchors, )
+        #     for i, r in enumerate(row_anchor):
+        #         if cur_row_anchor_label[i] == self.grid_num:
+        #             continue
+        #         y = r
+        #         x = int(cur_row_anchor_label[i] * (w - 1) / (self.grid_num - 1))
+        #         lane.append((x, y))
+        #
+        #     if len(lane) >= 2:
+        #         for i in range(len(lane) - 1):
+        #             cv2.line(img, lane[i], lane[i+1], color=(255, 0, 0), thickness=5)
+        # cv2.imshow('img', img)
+        # cv2.waitKey(0)
+
+    def __call__(self, results):
+        self._transform_annotation(results)
+        return results
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'(row_anchor={self.row_anchor}, '
+        repr_str += f'grid_num={self.grid_num}, '
+        repr_str += f'max_lanes={self.max_lanes}) '
+        return repr_str
