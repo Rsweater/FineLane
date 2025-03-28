@@ -6,12 +6,13 @@ tmp
 checkpoints
 weights
 work_dirs
-dataset
+datasets
 projects
 *.csv
 *.zip
 *.pyc
 .DS_Store
+.history
 .dist_test
 
 #nms
@@ -28,3 +29,4 @@ docker/
 
 # visualization files
 show/
+

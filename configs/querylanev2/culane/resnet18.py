@@ -15,12 +15,14 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-cfg_name = "bezierlanenet_culane_r18.py"
+cfg_name = "querylanev2_culane_r18.py"
 
 model = dict(
     backbone=dict(
         type='ResNet',
         depth=18,
+        num_stages=4,
+        out_indices=(0, 1, 2, 3),
         num_stages=4,
         out_indices=(0, 1, 2, 3),
         frozen_stages=-1,
@@ -60,13 +62,14 @@ model = dict(
     ),
 )
 
-custom_hooks = [dict(type="ExpMomentumEMAHook", momentum=0.0001, priority=5)]
+
 
 total_epochs = 36
 evaluation = dict(start=3, interval=3)
 checkpoint_config = dict(interval=1, max_keep_ckpts=10)
+custom_hooks = [dict(type="ExpMomentumEMAHook", momentum=0.0001, priority=5)]
 
-data = dict(samples_per_gpu=32)  # single GPU setting
+data = dict(samples_per_gpu=24, workers_per_gpu=4)  # single GPU setting
 
 # optimizer
 optimizer = dict(type='Adam', lr=0.001, betas=(0.9, 0.999), eps=1e-08)

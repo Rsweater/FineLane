@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from mmcv.cnn import ConvModule
 
+from .multi_scale_proposal_fusion import FocusedLinearAttention
+
 
 @ATTENTION.register_module()
 class QueryFeat(nn.Module):
@@ -21,6 +23,8 @@ class QueryFeat(nn.Module):
         self.in_channels = in_channels
         self.num_priors = num_priors
         self.cross_attention_weight = cross_attention_weight
+
+        self.self_attention = FocusedLinearAttention(in_channels)
 
         if self.cross_attention_weight > 0:
             self.attention = AnchorVecFeatureMapAttention(num_priors, in_channels)
@@ -57,7 +61,8 @@ class QueryFeat(nn.Module):
     def forward(self, prefusion_feature, proposal_features):
 
         if self.cross_attention_weight > 0:
-            context = self.attention(proposal_features, prefusion_feature)
+            context = self.self_attention(proposal_features)
+            context = self.attention(context, prefusion_feature)
             proposal_features = proposal_features + self.cross_attention_weight * F.dropout(
                 context, p=0.1, training=self.training
             )

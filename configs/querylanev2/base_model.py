@@ -16,7 +16,7 @@ model = dict(
         )),
     neck=dict(
         type='SPGChannelMapper',
-        in_channels=[128, 256, 512],
+        in_channels=[64, 128, 256, 512],
         kernel_size=1,
         out_channels=[256, 256, 256],
         act_cfg=None,

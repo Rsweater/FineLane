@@ -29,7 +29,7 @@ class QueryLaneHeadV31(nn.Module):
         fc_hidden_dim=64,
         seg_channel=64+64+64,
         num_fc=2,
-        refine_layers=3,
+        refine_layers=4,
         feat_sample_points=30,
         loss_sample_points=100,
         attention=None,
@@ -168,7 +168,7 @@ class QueryLaneHeadV31(nn.Module):
         feature_pyramid = list(x[len(x) - self.refine_layers :])
         feature_pyramid.reverse()  # (1, 64, 10, 25) (1, 64, 20, 50) (1, 64, 40, 100)
         proposal_feature = feature_pyramid[0]  # (1, 64, 10, 25)
-        prefusion_feature = feature_pyramid[1:]  # (1, 64, 20, 50) (1, 64, 40, 100)
+        # prefusion_feature = feature_pyramid[1:]  # (1, 64, 20, 50) (1, 64, 40, 100)
 
         # lane preselector
         pro_feature = self.channel_attention(proposal_feature).reshape(batch_size*self.prior_feat_channels, -1) # (B*C, H*W)
@@ -207,7 +207,7 @@ class QueryLaneHeadV31(nn.Module):
 
         query_feats = pro_fc_feature.permute(0, 2, 1).contiguous() # (B, Np, C)
         # pooled_features = []
-        for stage, feature in enumerate(prefusion_feature):
+        for _, feature in enumerate(feature_pyramid):
             pooled_feature = self.pool_prior_features(feature, pred_sample_points)
             # pooled_features.append(pooled_feature)
             query_feats = self.attention(

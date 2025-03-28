@@ -176,17 +176,6 @@ class QueryLaneHeadEmbeddings(nn.Module):
         pro_reg = self.pro_reg_layers(pro_fc_feature).permute(0, 2, 1).contiguous() # (B, Np, 4 + Nr)
         pro_cls = self.pro_cls_layers(pro_fc_feature.clone()).permute(0, 2, 1).contiguous() # (B, Np, 1)
 
-        # pro_cls_scores = pro_cls[:, :, 0]
-        # _, topk_inds = torch.topk(pro_cls[:, :, 0], k=self.prior_topk, dim=, largest=True, sorted=False)
-        
-        # select topk by topk_ind
-        # pred_dict = {
-        #     "cls_logits": pro_cls[torch.arange(batch_size)[:, None], topk_inds], # (B, 20, 2)
-        #     # "anchor_params": anchor_xyt[torch.arange(batch_size)[:, None], topk_inds], # (B, 20, 3)
-        #     # "lengths": pro_reg[torch.arange(batch_size)[:, None], topk_inds, 3:4], # (B, 20, 1)
-        #     "control_points": pro_reg[torch.arange(batch_size)[:, None], topk_inds], # (B, 20, 8)
-        #     "proposal": torch.ones(batch_size, dtype=torch.bool) # proposal flag(B, )
-        # }
         pred_dict = {
             "cls_logits": pro_cls,
             "control_points": pro_reg.reshape(batch_size, self.num_priors, 4, 2), 

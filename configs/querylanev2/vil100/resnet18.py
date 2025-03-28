@@ -17,7 +17,7 @@ custom_imports = dict(
 
 # 13、11、9、7、5
 
-cfg_name = "querylanev2_vil100_r18_w0.py"
+cfg_name = "querylanev2_vil100_r18.py"
 
 # model=dict(
 #     # training and testing settings
@@ -37,7 +37,7 @@ checkpoint_config = dict(interval=1)
 custom_hooks = [dict(type="ExpMomentumEMAHook", momentum=0.0001, priority=20)]
 
 
-data = dict(samples_per_gpu=48, workers_per_gpu=8)  # single GPU setting
+data = dict(samples_per_gpu=24, workers_per_gpu=8)  # single GPU setting
 
 # optimizer
 optimizer = dict(type='Adam', lr=0.001, betas=(0.9, 0.999), eps=1e-08)
