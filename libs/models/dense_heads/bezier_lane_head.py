@@ -158,7 +158,7 @@ class BezierLaneHead(nn.Module):
 
         pred_dict = {
             'cls_logits': logits,    # (B, W, 1)
-            'pred_control_points': reg,   # (B, W, 4, 2)
+            'control_points': reg,   # (B, W, 4, 2)
         }
         return pred_dict
 
@@ -167,7 +167,7 @@ class BezierLaneHead(nn.Module):
         Args:
             out_dict (Dict[torch.Trnsor]): A dictionary of prediction results, including:
                 - cls_logits (Tensor): Classification logits, shape (B, W, 1).
-                - pred_control_points (Tensor): Predicted control points, shape (B, W, 4, 2).
+                - control_points (Tensor): Predicted control points, shape (B, W, 4, 2).
             img_metas (list[dict]): Meta information of each image, e.g.,
                 image size, scaling factor, etc.
         Returns:
@@ -184,7 +184,7 @@ class BezierLaneHead(nn.Module):
                 k: v[b] for k, v in out_dict["predictions"].items()
             }
             cls_pred = pred_dict['cls_logits'] # (W, 1)
-            reg_pred = pred_dict['pred_control_points'] # (W, 4, 2)
+            reg_pred = pred_dict['control_points'] # (W, 4, 2)
             # get target results
             gt_lanes = img_meta['gt_lanes'].clone().to(device) # (N_lanes, 4, 2)
             cls_target = torch.zeros_like(cls_pred) # (W, 1)
@@ -254,7 +254,7 @@ class BezierLaneHead(nn.Module):
         scores = scores.sigmoid() # (W)
         existences = scores > self.test_cfg.conf_threshold
 
-        pred_control_points = pred_dict["pred_control_points"].squeeze(dim=0) # (W, 4, 2)
+        pred_control_points = pred_dict["control_points"].squeeze(dim=0) # (W, 4, 2)
         num_pred = pred_control_points.shape[0]
 
         if self.test_cfg.window_size > 0:

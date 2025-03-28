@@ -75,7 +75,6 @@ train_pipeline = [
             "gt_points",
             "gt_masks",
             "gt_lanes",
-            "no_aug_lanes"
         ],
     ),
 ]
@@ -100,8 +99,6 @@ val_pipeline = [
             "gt_points",
             "crop_shape",
             "crop_offset",
-            "gt_lanes",
-            "no_aug_lanes",
         ],
     ),
 ]

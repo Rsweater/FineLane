@@ -302,7 +302,7 @@ class QueryLaneHeadV2(nn.Module):
                     gt_control_points, num_sample_points=self.loss_sample_points
                 )
                 dist_loss = (
-                    dist_loss + self.loss_dist(pred_sample_points, gt_sample_points).mean()
+                    dist_loss + self.loss_dist(pred_sample_points, gt_sample_points)
                 )
 
         cls_loss = cls_loss / batch_size * len(out_dict["predictions"])

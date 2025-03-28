@@ -36,6 +36,16 @@ model = dict(
             num_classes=9,  # 8 lane + 1 background
         )
     ),
+    # training and testing settings
+    train_cfg=dict(
+        assigner=dict(
+            type="BezierHungarianAssigner",
+            order=3,
+            num_sample_points=100,
+            alpha=0.8,
+            window_size=7
+        )
+    ),
     test_cfg=dict(
         # dataset info
         ori_img_w="no fixed size",
@@ -43,15 +53,15 @@ model = dict(
         cut_height="no fixed size",
         # inference settings
         conf_threshold=0.4,
-        window_size=5,
+        window_size=7,
         max_num_lanes=8,
         num_sample_points=50,
     ),
 )
 
-total_epochs = 400
-evaluation = dict(start=10, interval=10)
-checkpoint_config = dict(interval=1, max_keep_ckpts=10)
+total_epochs = 150
+evaluation = dict(start=100, interval=10)
+checkpoint_config = dict(interval=1, max_keep_ckpts=20)
 
 
 data = dict(samples_per_gpu=48, workers_per_gpu=8)  # single GPU setting

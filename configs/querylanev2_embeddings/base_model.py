@@ -15,14 +15,12 @@ model = dict(
             'https://dl.fbaipublicfiles.com/semiweaksupervision/model_files/semi_weakly_supervised_resnet18-118f1556.pth'
         )),
     neck=dict(
-        type='SPGChannelMapper',
+        type='SA_FPN',
         in_channels=[128, 256, 512],
-        kernel_size=1,
-        out_channels=[256, 256, 256],
-        act_cfg=None,
-        norm_cfg=dict(type='GN', num_groups=32)),
+        out_channels=256,
+        num_outs=3),
     lane_head=dict(
-        type="QueryLaneHeadV2",
+        type="QueryLaneHeadEmbeddings",
         # num_priors=10,
         prior_feat_channels=256,
         attention_in_channels=256,

@@ -35,6 +35,8 @@ class QueryLaneHeadV31(nn.Module):
         attention=None,
         loss_cls=None,
         loss_dist=None,
+        loss_endpoint=None,
+        loss_length=None,
         loss_seg=None,
         train_cfg=None,
         test_cfg=None,
@@ -66,7 +68,7 @@ class QueryLaneHeadV31(nn.Module):
                 nn.ReLU(inplace=True)
             ))
         self.pro_shared_branchs_fc = nn.Sequential(*pro_shared_branchs_fc)
-        self.pro_cls_layers = nn.Conv1d(prior_feat_channels, 1, 1)
+        self.pro_cls_layers = nn.Conv1d(prior_feat_channels, 2, 1)
         self.pro_reg_layers = nn.Conv1d(prior_feat_channels, 8, 1)
 
         self.fc = nn.Linear(self.fc_hidden_dim*self.feat_sample_points, self.fc_hidden_dim)
@@ -87,10 +89,12 @@ class QueryLaneHeadV31(nn.Module):
         self.reg_modules = nn.ModuleList(reg_modules)
         self.cls_modules = nn.ModuleList(cls_modules)
         self.reg_layers = nn.Linear(self.fc_hidden_dim, 8)
-        self.cls_layers = nn.Linear(self.fc_hidden_dim, 1)
+        self.cls_layers = nn.Linear(self.fc_hidden_dim, 2)
         
         self.loss_cls = build_loss(loss_cls)
         self.loss_dist = build_loss(loss_dist)
+        self.loss_endpoint = build_loss(loss_endpoint)
+        self.loss_length = build_loss(loss_length)
         self.loss_seg = build_loss(loss_seg) if loss_seg["loss_weight"] > 0 else None
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
@@ -232,7 +236,7 @@ class QueryLaneHeadV31(nn.Module):
         # 4. reg processing
         pred_dict = {
             "cls_logits": cls_logits,
-            "control_points": reg.reshape(batch_size, self.num_priors, 4, 2),
+            "control_points": pro_reg.reshape(batch_size, self.num_priors, 4, 2)+reg.reshape(batch_size, self.num_priors, 4, 2),
             "proposal": torch.zeros(batch_size, dtype=torch.bool)
         }
 
@@ -261,6 +265,8 @@ class QueryLaneHeadV31(nn.Module):
         device = out_dict["predictions"][0]["cls_logits"].device
         cls_loss = torch.tensor(0.0).to(device)
         dist_loss = torch.tensor(0.0).to(device)
+        length_loss = torch.tensor(0.0).to(device)
+        endpoint_loss = torch.tensor(0.0).to(device)
 
         for stage in range(len(out_dict["predictions"])):
             for b, img_meta in enumerate(img_metas):
@@ -271,7 +277,7 @@ class QueryLaneHeadV31(nn.Module):
                 reg_pred = pred_dict['control_points'] # (W, 4, 2)
                 # get target results
                 gt_lanes = img_meta['gt_lanes'].clone().to(device) # (N_lanes, 4, 2)
-                cls_target = torch.zeros_like(cls_pred) # (W, 1)
+                cls_target = torch.zeros_like(cls_pred).long() # (W, 1)
 
                 if len(gt_lanes) == 0:
                     # If there are no targets, all predictions have to be negatives (i.e., 0 confidence)
@@ -285,7 +291,7 @@ class QueryLaneHeadV31(nn.Module):
                         matched_row_inds,
                         matched_col_inds,
                     ) = self.assigner.assign(
-                        pred_dict, gt_lanes.clone(), img_meta
+                        pred_dict, gt_lanes.clone()
                     )
 
                 # classification targets
@@ -305,14 +311,21 @@ class QueryLaneHeadV31(nn.Module):
                     gt_control_points, num_sample_points=self.loss_sample_points
                 )
                 dist_loss = (
-                    dist_loss + self.loss_dist(pred_sample_points, gt_sample_points).mean()
+                    dist_loss + self.loss_dist(pred_sample_points, gt_sample_points)
                 )
+                length_loss = self.loss_length(pred_sample_points, gt_sample_points)
+                endpoint_loss = self.loss_endpoint(pred_sample_points, gt_sample_points)
 
         cls_loss = cls_loss / batch_size * len(out_dict["predictions"])
         dist_loss = dist_loss / batch_size * len(out_dict["predictions"])
+        length_loss = length_loss / batch_size * len(out_dict["predictions"])
+        endpoint_loss = endpoint_loss / batch_size * len(out_dict["predictions"])
+        
         loss_dict = {
             "loss_cls": cls_loss,
             "loss_dist": dist_loss,
+            "loss_length": length_loss,
+            "loss_endpoint": endpoint_loss,
         }
 
         # extra segmentation loss
@@ -378,41 +391,44 @@ class QueryLaneHeadV31(nn.Module):
         Returns:
             list: A list of lanes.
         """
+        softmax = nn.Softmax(dim=1)
         assert (
             len(pred_dict["cls_logits"]) == 1
         ), "Only single-image prediction is available!"
         # filter out the conf lower than conf threshold
-        scores = pred_dict["cls_logits"].squeeze() # (W)
-        scores = scores.sigmoid() # (W)
-        existences = scores > self.test_cfg.conf_threshold
+        threshold = self.test_cfg.conf_threshold
+        scores = softmax(pred_dict["cls_logits"][0])[:, 1]
+        keep_inds = scores >= threshold
+        scores = scores[keep_inds]
 
         pred_control_points = pred_dict["control_points"].squeeze(dim=0) # (W, 4, 2)
-        num_pred = pred_control_points.shape[0]
-
-        if self.test_cfg.window_size > 0:
-            _, max_indices = F.max_pool1d(
-                scores.unsqueeze(0).unsqueeze(0).contiguous(),
-                kernel_size=self.test_cfg.window_size,
-                stride=1,
-                padding=(self.test_cfg.window_size - 1) // 2,
-                return_indices=True
-            ) # (1, 1, W)
-            max_indices = max_indices.squeeze(dim=1) # (1, W)
-            indices = torch.arange(0, num_pred, dtype=scores.dtype, 
-                device=scores.device).unsqueeze(dim=0).expand_as(max_indices) 
-            local_maximas = (max_indices == indices) # (B, W)
-            existences = existences * local_maximas
-
-        valid_score = scores * existences[0]
-        sorted_score, sorted_indices = torch.sort(valid_score, dim=0, descending=True)
-        valid_indices = torch.nonzero(sorted_score, as_tuple=True)[0][:self.test_cfg.max_num_lanes]
-
-        keep_index = sorted_indices[valid_indices] # (N_lanes, )
-        scores = scores[keep_index] # (N_lanes, )
-        pred_control_points = pred_control_points[keep_index] # (N_lanes, 4, 2)
-
-        if len(keep_index) == 0:
+        if pred_control_points.shape[0] == 0:
             return [], []
+
+        # if self.test_cfg.window_size > 0:
+        #     _, max_indices = F.max_pool1d(
+        #         scores.unsqueeze(0).unsqueeze(0).contiguous(),
+        #         kernel_size=self.test_cfg.window_size,
+        #         stride=1,
+        #         padding=(self.test_cfg.window_size - 1) // 2,
+        #         return_indices=True
+        #     ) # (1, 1, W)
+        #     max_indices = max_indices.squeeze(dim=1) # (1, W)
+        #     indices = torch.arange(0, num_pred, dtype=scores.dtype, 
+        #         device=scores.device).unsqueeze(dim=0).expand_as(max_indices) 
+        #     local_maximas = (max_indices == indices) # (B, W)
+        #     existences = existences * local_maximas
+
+        # valid_score = scores * existences[0]
+        # sorted_score, sorted_indices = torch.sort(valid_score, dim=0, descending=True)
+        # valid_indices = torch.nonzero(sorted_score, as_tuple=True)[0][:self.test_cfg.max_num_lanes]
+
+        # keep_index = sorted_indices[valid_indices] # (N_lanes, )
+        # scores = scores[keep_index] # (N_lanes, )
+        # pred_control_points = pred_control_points[keep_index] # (N_lanes, 4, 2)
+
+        # if len(keep_index) == 0:
+        #     return [], []
         
         preds = self.predictions_to_lanes(scores, pred_control_points, as_lane)
 

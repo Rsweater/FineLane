@@ -15,46 +15,36 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-cfg_name = "bezierlanenet_culane_r18.py"
+cfg_name = "bezierlanenet_culane_dla34.py"
 
 model = dict(
     backbone=dict(
-        type='ResNet',
-        depth=18,
-        num_stages=4,
-        out_indices=(0, 1, 2, 3),
-        frozen_stages=-1,
-        norm_cfg=dict(type='BN', requires_grad=True),
-        norm_eval=False,
-        style='pytorch',
-        init_cfg=dict(
-            type='Pretrained',
-            checkpoint=
-            'https://dl.fbaipublicfiles.com/semiweaksupervision/model_files/semi_weakly_supervised_resnet18-118f1556.pth'
-        )),
+        type="DLANet",
+        dla="dla34",
+        pretrained=True,
+        # out_indices=(4,) # c=256, [16, 32, 64, 128, 256, 512]
+    ),
     lane_head=dict(
-        # type="BezierLaneHeadV2",
-        # loss_cls=dict(
-        #     loss_weight=2.0,
-        # ),
-        # loss_dist=dict(
-        #     loss_weight=3.0,
-        # ),
+        loss_cls=dict(
+            loss_weight=1.0,
+        ),
+        loss_dist=dict(
+            loss_weight=6.0,
+        ),
         loss_seg=dict(
-            # loss_weight=0.50,
-            num_classes=5,
+            loss_weight=0.75,
         ),
     ),
      # training and testing settings
     test_cfg=dict(
         # dataset info
-        dataset="culane",
+        # dataset="tusimple",
         ori_img_w=1640,
         ori_img_h=590,
         cut_height=270,
         # inference settings
         conf_threshold=0.95,
-        window_size=11,
+        window_size=9,
         max_num_lanes=4,
         num_sample_points=50,
     ),
@@ -69,7 +59,7 @@ checkpoint_config = dict(interval=1, max_keep_ckpts=10)
 data = dict(samples_per_gpu=32)  # single GPU setting
 
 # optimizer
-optimizer = dict(type='Adam', lr=0.001, betas=(0.9, 0.999), eps=1e-08)
+optimizer = dict(type="AdamW", lr=6e-4)
 optimizer_config = dict(grad_clip=None)
 
 # learning policy
@@ -88,3 +78,4 @@ log_config = dict(
         dict(type="TensorboardLoggerHookEpoch"),
     ]
 )
+# find_unused_parameters=True

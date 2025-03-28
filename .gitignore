@@ -12,6 +12,7 @@ projects
 *.zip
 *.pyc
 .DS_Store
+.dist_test
 
 #nms
 dist/
@@ -24,3 +25,6 @@ __pycache__/
 # tmp remove docker files
 docker-compose.yml
 docker/
+
+# visualization files
+show/

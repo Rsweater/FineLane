@@ -413,7 +413,6 @@ class DLANet(nn.Module):
         pretrained=True,
         levels=[1, 1, 1, 2, 2, 1],
         in_channels=[16, 32, 64, 128, 256, 512],
-        out_indices=(2, 3, 4, 5), 
         cfg=None,
     ):
         super(DLANet, self).__init__()
@@ -421,7 +420,7 @@ class DLANet(nn.Module):
         self.in_channels = in_channels
 
         self.model = eval(dla)(
-            pretrained=pretrained, levels=levels, in_channels=in_channels, out_indices=out_indices
+            pretrained=pretrained, levels=levels, in_channels=in_channels
         )
 
     def forward(self, x):

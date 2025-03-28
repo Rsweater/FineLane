@@ -17,7 +17,7 @@ from libs.utils.lane_utils import Lane
 from libs.core.lane.bezier_curve import BezierCurve
 
 @HEADS.register_module
-class QueryLaneHeadV2(nn.Module):
+class QueryLaneHeadEmbeddings(nn.Module):
     def __init__(
         self,
         img_w=800,
@@ -30,8 +30,8 @@ class QueryLaneHeadV2(nn.Module):
         seg_channel=64+64+64,
         num_fc=2,
         refine_layers=3,
-        feat_sample_points=5,
-        loss_sample_points=200,
+        feat_sample_points=30,
+        loss_sample_points=100,
         attention=None,
         loss_cls=None,
         loss_dist=None,
@@ -39,7 +39,7 @@ class QueryLaneHeadV2(nn.Module):
         train_cfg=None,
         test_cfg=None,
     ):
-        super(QueryLaneHeadV2, self).__init__()
+        super(QueryLaneHeadEmbeddings, self).__init__()
         self.bezier_curve = BezierCurve(order=3)
         self.img_w = img_w
         self.img_h = img_h
@@ -67,7 +67,8 @@ class QueryLaneHeadV2(nn.Module):
         self.pro_shared_branchs_fc = nn.Sequential(*pro_shared_branchs_fc)
         self.pro_cls_layers = nn.Conv1d(prior_feat_channels, 1, 1)
         self.pro_reg_layers = nn.Conv1d(prior_feat_channels, 8, 1)
-
+        
+        self.query_feats_init = nn.Embedding(self.num_priors, self.fc_hidden_dim)
         self.attention = build_attention(attention)
 
         reg_modules = list()
@@ -198,7 +199,10 @@ class QueryLaneHeadV2(nn.Module):
             pro_reg.reshape(-1, 4, 2), num_sample_points=self.feat_sample_points
         )
 
-        query_feats = pro_fc_feature.permute(0, 2, 1).contiguous()
+        
+        query_feats = self.query_feats_init.weight.unsqueeze(0).repeat(
+            batch_size, 1, 1
+        )
         pooled_features = []
         for stage, feature in enumerate(prefusion_feature):
             pooled_feature = self.pool_prior_features(feature, pred_sample_points)
@@ -302,7 +306,7 @@ class QueryLaneHeadV2(nn.Module):
                     gt_control_points, num_sample_points=self.loss_sample_points
                 )
                 dist_loss = (
-                    dist_loss + self.loss_dist(pred_sample_points, gt_sample_points).mean()
+                    dist_loss + self.loss_dist(pred_sample_points, gt_sample_points)
                 )
 
         cls_loss = cls_loss / batch_size * len(out_dict["predictions"])

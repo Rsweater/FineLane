@@ -87,6 +87,7 @@ train_pipeline = [
             "gt_points",
             "gt_masks",
             "gt_lanes",
+            "no_aug_lanes"
         ],
     ),
 ]
@@ -105,6 +106,8 @@ val_pipeline = [
             "ori_shape",
             "img_shape",
             "img_norm_cfg",
+            "gt_lanes",
+            "no_aug_lanes"
         ],
     ),
 ]
@@ -127,13 +130,13 @@ data = dict(
         data_root=data_root,
         data_list=data_root + "/list/test.txt",
         pipeline=val_pipeline,
-        test_mode=True,
+        test_mode=False,
     ),
     test=dict(
         type=dataset_type,
         data_root=data_root,
         data_list=data_root + "/list/test.txt",
         pipeline=val_pipeline,
-        test_mode=True,
+        test_mode=False,
     ),
 )

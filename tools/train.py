@@ -78,6 +78,7 @@ def parse_args():
         help="job launcher",
     )
     parser.add_argument("--local_rank", type=int, default=0)
+    parser.add_argument('--dynamic_tanh', type=bool, default=True)
     args = parser.parse_args()
     if "LOCAL_RANK" not in os.environ:
         os.environ["LOCAL_RANK"] = str(args.local_rank)
@@ -183,6 +184,9 @@ def main():
         cfg.model, train_cfg=cfg.get("train_cfg"), test_cfg=cfg.get("test_cfg")
     )
     model.init_weights()
+
+    if args.dynamic_tanh:
+        model = convert_ln_to_dyt(model)
 
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:

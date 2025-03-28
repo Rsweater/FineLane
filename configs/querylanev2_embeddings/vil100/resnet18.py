@@ -15,37 +15,11 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-cfg_name = "querylanev31_vil100_r18_chamfer.py"
+cfg_name = "querylanev2_vil100_r18.py"
 
-ckpt_timm = 'https://dl.fbaipublicfiles.com/semiweaksupervision/model_files/semi_weakly_supervised_resnet18-118f1556.pth'
-model = dict(
-    backbone=dict(
-        type='ResNet',
-        depth=18,
-        num_stages=4,
-        out_indices=(0, 1, 2, 3),
-        frozen_stages=-1,
-        norm_cfg=dict(type='BN', requires_grad=True),
-        norm_eval=False,
-        style='pytorch',
-        init_cfg=dict(type='Pretrained', checkpoint=ckpt_timm)  #'torchvision://resnet18'
-    ),
-    # lane_head=dict(
-    #     loss_seg=dict(
-    #         loss_weight=0.1,
-    #         num_classes=9,  # 8 lane + 1 background
-    #     )
-    # ),
-    # # training and testing settings
-    # train_cfg=dict(
-    #     assigner=dict(
-    #         window_size=0
-    #     )
-    # ),
-    # test_cfg=dict(
-    #     window_size=0
-    # ),
-)
+# model=dict(
+  
+#  )
 
 total_epochs = 400
 evaluation = dict(start=10, interval=3)

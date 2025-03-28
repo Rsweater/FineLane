@@ -15,66 +15,41 @@ custom_imports = dict(
     allow_failed_imports=False,
 )
 
-cfg_name = "querylanev2_vil100_r18.py"
+# 13、11、9、7、5
 
-model = dict(
-    backbone=dict(
-        type='ResNet',
-        depth=18,
-        num_stages=4,
-        out_indices=(0, 1, 2, 3),
-        frozen_stages=-1,
-        norm_cfg=dict(type='BN', requires_grad=True),
-        norm_eval=False,
-        style='pytorch',
-        init_cfg=dict(type='Pretrained', checkpoint='torchvision://resnet18')),
-    lane_head=dict(
-        loss_seg=dict(
-            loss_weight=0.75,
-            num_classes=9,  # 8 lane + 1 background
-        )
-    ),
-    test_cfg=dict(
-        # dataset info
-        ori_img_w="no fixed size",
-        ori_img_h="no fixed size",
-        cut_height="no fixed size",
-        # inference settings
-        conf_threshold=0.4,
-        window_size=5,
-        max_num_lanes=6,
-        num_sample_points=50,
-    ),
-)
+cfg_name = "querylanev2_vil100_r18_w0.py"
 
-total_epochs = 400
-evaluation = dict(start=10, interval=3)
-checkpoint_config = dict(interval=1, max_keep_ckpts=10)
+# model=dict(
+#     # training and testing settings
+#     train_cfg=dict(
+#         assigner=dict(
+#             window_size=0
+#         )
+#     ),
+#     test_cfg=dict(
+#         window_size=0
+#     ),
+#  )
+
+total_epochs = 250
+evaluation = dict(start=100, interval=1)
+checkpoint_config = dict(interval=1)
 custom_hooks = [dict(type="ExpMomentumEMAHook", momentum=0.0001, priority=20)]
 
 
 data = dict(samples_per_gpu=48, workers_per_gpu=8)  # single GPU setting
 
 # optimizer
-optimizer = dict(
-    type='Adam',
-    lr=1e-3,
-    paramwise_cfg=dict(
-        custom_keys={
-            'conv_offset': dict(lr_mult=0.1),
-        }),
-)
+optimizer = dict(type='Adam', lr=0.001, betas=(0.9, 0.999), eps=1e-08)
 optimizer_config = dict(grad_clip=None)
 
 # learning policy
 lr_config = dict(
-    policy='CosineAnnealing',
+    policy='Poly',
     warmup='linear',
-    warmup_iters=500,
-    warmup_ratio=1.0 / 3,
-    min_lr_ratio=1e-3,
-    by_epoch=True
-)
+    warmup_iters=100,
+    warmup_ratio=0.1,
+    min_lr=1e-05)
 
 log_config = dict(
     interval=10,

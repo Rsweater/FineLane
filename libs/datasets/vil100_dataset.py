@@ -3,6 +3,7 @@ Adapted from:
 https://github.com/aliyun/conditional-lane-detection/blob/master/mmdet/datasets/culane_dataset.py
 """
 import shutil
+import logging
 from pathlib import Path
 
 import json
@@ -11,10 +12,13 @@ from PIL import Image
 from torch.utils.data import Dataset
 from mmdet.datasets.builder import DATASETS
 from mmdet.utils import get_root_logger
+from mmcv.utils import print_log
 from tqdm import tqdm
 
-from libs.datasets.metrics.vil100_metric import eval_predictions
+from libs.datasets.metrics.vil100_metric import eval_predictions, culane_metric
+from libs.datasets.metrics.official_vil100_metrics import LaneEval
 from libs.datasets.pipelines import Compose
+from libs.utils.visualizer import visualize_lanes
 
 
 @DATASETS.register_module
@@ -30,6 +34,7 @@ class VIL100Dataset(Dataset):
         diff_thr=15,
         test_mode=True,
         y_step=1,
+        use_official_metric=True,
     ):
         """
         Args:
@@ -42,8 +47,9 @@ class VIL100Dataset(Dataset):
                 to sample the predicted lanes for evaluation.
 
         """
-
+        self.logger = get_root_logger(log_level="INFO")
         self.img_prefix = data_root
+        self.jsondir = str(Path(data_root).joinpath("Json"))
         self.test_mode = test_mode
         # read image list
         self.diffs = (
@@ -64,6 +70,8 @@ class VIL100Dataset(Dataset):
         self.pipeline = Compose(pipeline)
         self.result_dir = "tmp"
         self.y_step = y_step
+        self.use_official_metric = use_official_metric
+
 
     def parse_datalist(self, data_list):
         """
@@ -73,21 +81,17 @@ class VIL100Dataset(Dataset):
         Returns:
             List[str]: List of image paths.
         """
-        print("Geting VIL100 dataset...")
+        print_log("Geting VIL100 dataset...", logger=self.logger)
         with open(data_list, "r") as img_list_file:
             img_infos = [
                 img_name.strip()[1:] for img_name in img_list_file.readlines()
             ]
-        if not self.test_mode:
-            annotations = [
-                img_path.replace("JPEGImages", "Json") + ".json" for img_path in img_infos
-            ]
-            mask_paths = [
-                img_path[:-3].replace("JPEGImages", "Annotations") + "png" for img_path in img_infos
-            ]
-        else:
-            annotations = ["testing..."]
-            mask_paths = ["testing..."]
+        annotations = [
+            img_path.replace("JPEGImages", "Json") + ".json" for img_path in img_infos
+        ]
+        mask_paths = [
+            img_path[:-3].replace("JPEGImages", "Annotations") + "png" for img_path in img_infos
+        ]
         return img_infos, annotations, mask_paths
 
     def _set_group_flag(self):
@@ -124,20 +128,20 @@ class VIL100Dataset(Dataset):
             crop_offset=crop_offset,
             crop_shape=crop_shape,
         )
-        if not self.test_mode:
-            kps, id_classes, id_instances = self.load_labels(idx, cut_height)
-            results["gt_points"] = kps
-            results["id_classes"] = id_classes
-            results["id_instances"] = id_instances
-            results["eval_shape"] = (
-                crop_shape[0],
-                crop_shape[1],
-            )  # Used for LaneIoU calculation for VIL100 dataset.
-            if self.mask_paths[0]:
-                mask = self.load_mask(idx)
-                mask = mask[cut_height:, :]
-                assert mask.shape[:2] == crop_shape[:2]
-                results["gt_masks"] = mask
+        kps, old_kps, id_classes, id_instances = self.load_labels(idx, cut_height)
+        results["gt_points"] = kps
+        results["no_aug_lanes"] = old_kps
+        results["id_classes"] = id_classes
+        results["id_instances"] = id_instances
+        results["eval_shape"] = (
+            crop_shape[0],
+            crop_shape[1],
+        )  # Used for LaneIoU calculation for VIL100 dataset.
+        if self.mask_paths[0]:
+            mask = self.load_mask(idx)
+            mask = mask[cut_height:, :]
+            assert mask.shape[:2] == crop_shape[:2]
+            results["gt_masks"] = mask
 
         return self.pipeline(results)
 
@@ -171,16 +175,17 @@ class VIL100Dataset(Dataset):
             ]
         # point of lane, y of lane, y+offset_y
         # lanes: [[(x_00,y0), (x_01,y1), ...], [(x_10,y0), (x_11,y1), ...], ...]
+        old_lanes = [[(point[0], point[1]) for point in lane] for lane in lanes]
         lanes = [[(point[0], point[1] - cut_height) for point in lane] for lane in lanes]
         # # remove duplicated points in each lane
         # lanes = [list(set(lane)) for lane in lanes]  
-        # # remove lanes with less than 2 points 
-        # lanes = [lane for lane in lanes if len(lane) > 1] 
-        # sort lanes by their y-coordinates in ascending order for interpolation
+        # # # remove lanes with less than 2 points 
+        # lanes = [lane for lane in lanes if len(lane) > 2] 
+        # # sort lanes by their y-coordinates in ascending order for interpolation
         # lanes = [sorted(lane, key=lambda x: x[1]) for lane in lanes] 
         id_classes = [1 for i in range(len(lanes))]
         id_instances = [i + 1 for i in range(len(lanes))]
-        return lanes, id_classes, id_instances
+        return lanes, old_lanes, id_classes, id_instances
     
     def evaluate(self, results, metric="F1", logger=None):
         """
@@ -216,6 +221,8 @@ class VIL100Dataset(Dataset):
                 }
                 json.dump(output, out_file)
 
+        print_log("Computing metrics...", logger=self.logger)
+
         results = eval_predictions(
             self.result_dir,
             self.img_prefix,
@@ -223,6 +230,21 @@ class VIL100Dataset(Dataset):
             # self.annotations,
             logger=get_root_logger(log_level="INFO"),
         )
+
+        accuracy, fp, fn = LaneEval.calculate_return(
+            str(Path(self.result_dir).joinpath('Json')), 
+            str(Path(self.img_prefix).joinpath('Json')),
+            logger=get_root_logger()
+        )
+
+        results.update(
+            {
+                "accuracy": accuracy,
+                "fp": fp,
+                "fn": fn,
+            }
+        )
+
         shutil.rmtree(self.result_dir)
         return results
 
@@ -241,3 +263,27 @@ class VIL100Dataset(Dataset):
                 lanes.append(lane)
 
         return lanes
+
+    def Lane2list_org(self,pred, ori_shape):
+        """
+        Returns a list of lanes, where each lane is a list of points (x,y)
+        """
+        ys = np.arange(0, ori_shape[0], self.y_step) / ori_shape[0]
+        xs = pred(ys)
+        valid_mask = (xs >= 0) & (xs < 1)
+        xs = xs * ori_shape[1]
+        lane_xs = xs[valid_mask]
+        lane_ys = ys[valid_mask] * ori_shape[0]
+        lane = np.concatenate((lane_xs.reshape(-1, 1), lane_ys.reshape(-1, 1)), axis=1)
+        return lane
+
+    def show_result(self, img, lanes, gts, save_path, img_shape, iou_thr=0.5):
+        lanes = [self.Lane2list_org(lane, img_shape) for lane in lanes]
+        gts = [list(set(gt)) for gt in gts]  # remove duplicated points
+        gts = [gt for gt in gts
+                if len(gt) > 2]  # remove lanes with less than 2 points
+        gts = [sorted(gt, key=lambda x: x[1])
+                for gt in gts]  # sort by y   按y轴坐标从小到大排列
+        gts = [np.array(lane) for lane in gts]
+        pred_ious = culane_metric(lanes, gts, img_shape, width=30)['iou']
+        visualize_lanes(img, lanes, gts, pred_ious, iou_thr=iou_thr, save_path=save_path)
