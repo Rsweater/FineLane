@@ -1,42 +1,13 @@
-# Rethinking Efficient Lane Detection via Curve Modeling
+# 稀疏高质量查询优化的车道线检测
 
-([Arxiv 2203](https://arxiv.org/abs/2203.02431)) **BézierLaneNet:** Rethinking Efficient Lane Detection via Curve Modeling. [Zhengyang Feng](https://dblp.uni-trier.de/pid/263/3128.html) et al. [CVPR 2022](https://doi.org/10.1109/CVPR52688.2022.01655). [Code](https://github.com/voldemortX/pytorch-auto-drive)![Stars](https://img.shields.io/github/stars/voldemortX/pytorch-auto-drive)
-![img](../_base_/figures/bezierlanenet.png)
+> 毕业论文第四章
 
-## Abstract
+![img](images/querylane.svg)
 
-This paper presents a novel parametric curve-based method for lane detection in RGB images. Unlike stateof-the-art segmentation-based and point detection-based methods that typically require heuristics to either decode predictions or formulate a large sum of anchors, the curvebased methods can learn holistic lane representations naturally. To handle the optimization difficulties of existing polynomial curve methods, we propose to exploit the parametric B ́ezier curve due to its ease of computation, stability, and high freedom degrees of transformations. In addition, we propose the deformable convolution-based feature flip fusion, for exploiting the symmetry properties of lanes in driving scenes. The proposed method achieves a new state-ofthe-art performance on the popular LLAMAS benchmark. It also achieves favorable accuracy on the TuSimple and CULane datasets, while retaining both low latency (>150 FPS) and small model size (<10M). Our method can serve as a new baseline, to shed the light on the parametric curves modeling for lane detection. Codes of our model and PytorchAutoDrive: a unified framework for self-driving perception, are available at: https://github.com/ voldemortX/pytorch-auto-drive.
+## 摘要
 
-## Results and Models
+针对基于无参考的车道线检测方法中存在的查询成本高、查询特征表征模糊以及查询特征区分度不足的问题，本研究提出了一种稀疏高质量查询优化驱动的高效车道线检测方法，构建了高质量查询初始化网络，通过网络学习来对查询初始化，解决车道线查询表征模糊的问题；设计了车道线特征层次化稀疏查询策略，通过跨层次指定区域查询，实现轻量级的车道线多尺度特征查询以及融合；实现了基于空间约束的匈牙利标签匹配方法，通过最大池化操作增强查询特征的区分度，缓解模型收敛困难问题。实验表明，在ResNet-18主干网络上，该方法在 VIL100 数据集上mIoU 、F1 、Accary 、FP、 FN 指标分别达到了 86.6%、92.7%、94.8%、4.8%、4.7%，均达到基于单帧方法的SOTA水平。
 
-### Results on CuLane
 
-| Architecture | Backbone |      F1@50      | F1@75 | mF1 | Config | Download |
-| :-----------: | :-------: | :-------------: | ----- | --- | ------ | -------- |
-| BezierLaneNet | ResNet-18 | 73.67*\| 73.12 |       |     |        |          |
-| BezierLaneNet | ResNet-34 |   75.57*\| 7   |       |     |        |          |
-| BezierLaneNet |  DLA-34  |                |       |     |        |          |
-
-### Results on TuSimple
-
-| Architecture | Backbone | F1@50 | F1@75 | mF1 | Config | Download |
-| :-----------: | :-------: | :----: | ----- | --- | ------ | -------- |
-| BezierLaneNet | ResNet-18 | 95.41* |       |     |        |          |
-| BezierLaneNet | ResNet-34 | 95.65* |       |     |        |          |
-| BezierLaneNet |  DLA-34  |        |       |     |        |          |
-
-### Results on VIL-100
-
-| Architecture | Backbone | F1@50 | F1@75 | mF1 | Config | Download |
-| :-----------: | :-------: | :---: | ----- | --- | ------ | :------: |
-| BezierLaneNet | ResNet-18 | 85.93 |       |     |        |          |
-| BezierLaneNet | ResNet-34 |      |       |     |        |          |
-| BezierLaneNet |  DLA-34  |      |       |     |        |          |
-
-### Results on CurveLanes
-
-| Architecture | Backbone | F1@50 | F1@75 | mF1 | Config | Download |
-| :-----------: | :-------: | ----- | ----- | --- | ------ | -------- |
-| BezierLaneNet | ResNet-18 |       |       |     |        |          |
-| BezierLaneNet | ResNet-34 |       |       |     |        |          |
-| BezierLaneNet |  DLA-34  |       |       |     |        |          |
+## Results and Visualization
+![img](images/vil100_results.svg)
